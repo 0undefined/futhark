@@ -182,6 +182,7 @@ library
       Futhark.CLI.Autotune
       Futhark.CLI.Bench
       Futhark.CLI.C
+      Futhark.CLI.Completion
       Futhark.CLI.CUDA
       Futhark.CLI.Check
       Futhark.CLI.Benchcmp
