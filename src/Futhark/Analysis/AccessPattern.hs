@@ -63,7 +63,7 @@ getAids f = M.singleton fdname aids
     fdname = funDefName f
     aids =
       -- merge results
-      foldl' mergeMemAccTable M.empty
+      mergeMemAccTable
         -- map analyzation over stmts
         . fmap analyseStm
         -- functionBody -> [stm]
@@ -72,29 +72,25 @@ getAids f = M.singleton fdname aids
         . funDefBody
         $ f
 
--- Concat the list off array access (note, access != dimensions)
-mergeMemAccTable :: ArrayIndexDescriptors -> ArrayIndexDescriptors -> ArrayIndexDescriptors
-mergeMemAccTable = M.unionWith (++)
+-- Concat the lists of MemoryEntries
+mergeMemAccTable :: [ArrayIndexDescriptors] -> ArrayIndexDescriptors
+mergeMemAccTable = foldl' (M.unionWith (++)) M.empty
 
 -- TODO:
 -- Add patterns here
 analyseStm :: Stm GPU -> ArrayIndexDescriptors
 -- Recurse into cases / conditional branches
 analyseStm (Let _ _ (Match _ _ b _)) =
-  foldl' mergeMemAccTable M.empty $
-    fmap analyseStm . stmsToList . bodyStms $
-      b
+  mergeMemAccTable . fmap analyseStm . stmsToList . bodyStms $ b
+
 -- TODO: investigate whether we need the remaining patterns in (Pat (p:_))
 analyseStm (Let (Pat (p : _)) _ (BasicOp o)) = M.singleton (patElemName p) [analyseOp o]
 analyseStm (Let _ _ (Op (SegOp o))) =
-  foldl' mergeMemAccTable M.empty
+  mergeMemAccTable
     . fmap analyseStm
     . stmsToList
     . kernelBodyStms
     $ segBody o
--- analyseStm (Let (Pat pp) _ _) =
---  foldl' mergeMemAccTable M.empty
---    $ map (\n -> M.singleton (patElemName n) []) pp
 
 analyseStm _ = M.empty
 
