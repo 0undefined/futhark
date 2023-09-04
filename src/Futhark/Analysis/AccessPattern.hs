@@ -30,12 +30,15 @@ data Variance
   | Invariant
   deriving (Eq, Ord, Show)
 
+newtype IndexExpression = IndexExpression (Either VName PrimValue)
+  deriving (Eq, Ord, Show)
+
 -- | Collect all features of memory access together
 data MemoryAccessPattern = MemoryAccessPattern
   { -- | Expression reference that is used to index into a given dimension
-    idxExpr :: VName,
+    idxExpr :: IndexExpression,
     iterationType :: IterationType,
-    pattern :: Pattern,
+    pattern' :: Pattern,
     variance :: Variance
   }
   deriving (Eq, Ord, Show)
@@ -91,29 +94,28 @@ analyseStm (Let _ _ (Op (SegOp o))) =
     . stmsToList
     . kernelBodyStms
     $ segBody o
-
 analyseStm _ = M.empty
 
-analyseOp :: BasicOp -> [MemoryAccessPattern]
+analyseOp :: BasicOp -> MemoryEntry
 analyseOp (Index name (Slice unslice)) =
   map
     ( \case
-        (DimFix (Constant _)) ->
+        (DimFix (Constant primvalue)) ->
           MemoryAccessPattern
-            (VName "const" 0)
+            (IndexExpression $ Right primvalue)
             Sequential
             Linear
             Invariant
         (DimFix (Var n)) ->
           MemoryAccessPattern
-            n
+            (IndexExpression $ Left n)
             Sequential
             Linear
             Variant
         -- FIXME
         _ ->
           MemoryAccessPattern
-            name
+            (IndexExpression $ Left name)
             Sequential
             Linear
             Variant
@@ -130,11 +132,23 @@ instance Pretty FunAids where
 instance Pretty ArrayIndexDescriptors where
   pretty = stack . map f . M.toList :: ArrayIndexDescriptors -> Doc ann
     where
-      f (n, maps) = pretty n <+> pretty maps
+      mapprint [] = ""
+      mapprint (e : ee) = pretty e <+> mapprint ee
+
+      f (n, maps) = pretty n <+> mapprint maps
 
 instance Pretty MemoryAccessPattern where
-  pretty (MemoryAccessPattern idx _t _p v) =
-    let var = case v of
-          Variant -> "VAR"
-          Invariant -> "INV"
-     in brackets $ pretty idx <+> "|" <+> var
+  pretty (MemoryAccessPattern idx t _p v) =
+    brackets $ pretty idx <+> "|" <+> pretty v <+> "|" <+> pretty t
+
+instance Pretty IndexExpression where
+  pretty (IndexExpression (Left n)) = "σ" <+> pretty n -- sigma since it exists in our store
+  pretty (IndexExpression (Right c)) = "τ" <+> pretty c -- tau for a term
+
+instance Pretty IterationType where
+  pretty Sequential = "seq"
+  pretty Parallel = "par"
+
+instance Pretty Variance where
+  pretty Variant = "υ" -- v for variant
+  pretty Invariant = "ψ" -- v dashed for invariant
