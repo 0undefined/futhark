@@ -398,9 +398,18 @@ analyzeIndex ctx pats arr_name dimIndexes = do
   -- replace deps in last index of slice with the union,
   -- `analyzeIndex' ctx' pats array_name' newDeps`
   either
-    (analyzeIndex' ctx' pats array_name')
-    (\d -> (ctx' {slices = M.insert arr_name d $ slices ctx'}, mempty))
+    (index ctx' array_name')
+    (slice ctx')
     dependencies
+  where
+    index context arrayName dimAccess =
+      case M.lookup (fst arrayName) $ slices context of
+        Nothing -> analyzeIndex' context pats arrayName dimAccess
+        Just sliceAccess -> do
+          analyzeIndex' context pats arrayName (init sliceAccess ++ [last sliceAccess <> head dimAccess] ++ drop 1 dimAccess)
+
+    slice context dims =
+      (context {slices = M.insert (head pats) dims $ slices context}, mempty)
 
 analyzeIndexContextFromIndices :: Context rep -> [DimIndex SubExp] -> [VName] -> Context rep
 analyzeIndexContextFromIndices ctx dimIndexes pats = do
