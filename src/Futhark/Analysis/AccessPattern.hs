@@ -353,11 +353,19 @@ analyzeStm ctx (Let pats _ e) = do
 
 -- If left, this is just a regular index. If right, a slice happened.
 getIndexDependencies :: Context rep -> [DimIndex SubExp] -> Either [DimAccess rep] [DimAccess rep]
-getIndexDependencies _ [] = Left []
 getIndexDependencies ctx dims =
-  fst
-    . foldl' (\(a, i) idx -> (a >>= matchDimIndex idx i, i - 1)) (Left [], length dims - 1)
-    $ reverse dims
+    fst
+    $ foldr
+      ( \idx (a, i) -> do
+          let acc =
+                either
+                  (matchDimIndex idx i)
+                  (forceRight . matchDimIndex idx i)
+                  a
+          (acc, i - 1)
+      )
+      (Left [], length dims - 1)
+      dims
   where
     matchDimIndex idx i accumulator =
       case idx of
@@ -370,10 +378,12 @@ getIndexDependencies ctx dims =
           let dimAccess = consolidate ctx offset <> consolidate ctx num_elems <> consolidate ctx stride
            in Right $ dimAccess {originalDimension = i} : accumulator
 
+    forceRight (Left a) = Right a
+    forceRight (Right a) = Right a
+
 -- | Gets the dependencies of each dimension and either returns a result, or
 -- adds a slice to the context.
 analyzeIndex :: Context rep -> [VName] -> VName -> [DimIndex SubExp] -> (Context rep, IndexTable rep)
-analyzeIndex ctx _ _ [] = (ctx, mempty)
 analyzeIndex ctx pats arr_name dimIndexes = do
   -- Get the dependendencies of each dimension
   let dependencies = getIndexDependencies ctx dimIndexes
