@@ -40,7 +40,6 @@ import Futhark.Pass.ExplicitAllocations.Seq qualified as Seq
 import Futhark.Pass.ExtractKernels
 import Futhark.Pass.ExtractMulticore
 import Futhark.Pass.FirstOrderTransform
-import Futhark.Pass.KernelBabysitting
 import Futhark.Pass.LiftAllocations as LiftAllocations
 import Futhark.Pass.LowerAllocations as LowerAllocations
 import Futhark.Pass.Simplify
@@ -102,7 +101,6 @@ gpuPipeline =
         mergeGPUBodies,
         simplifyGPU, -- Cleanup merged GPUBody kernels.
         sinkGPU, -- Sink reads within GPUBody kernels.
-        babysitKernels,
         -- Important to simplify after babysitting in order to fix up
         -- redundant manifests.
         simplifyGPU,
